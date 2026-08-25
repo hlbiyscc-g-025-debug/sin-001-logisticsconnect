@@ -2,93 +2,191 @@
 
 ## Overview
 
-Parses and cleans `hubs-global.csv`, a messy legacy export of hubs, sorting centers, and regional districts data, and is the
-first stop in the LogisticsConnect pipeline. Independent Maven module, no parent pom.
+Parses and cleans `hubs-global.csv`, a messy legacy export containing hub and sorting center data.
+
+The Ingestion Service is the first service in the LogisticsConnect pipeline. It cleans and normalizes the raw CSV data before exposing the cleaned records through a REST API for other services to consume.
 
 Part of the [LogisticsConnect](../README.md) project.
 
-## Known data issues
+## Data Cleaning
 
-`hubs-global.csv` is deliberately messy — cleaning it is the point of this service. Look
-out for (and handle) at least:
+The service handles the following issues in `hubs-global.csv`:
 
-- **Inconsistent casing** in IDs, names, and status/category values (`Active` /
-  `active` / `ACTIVE`)
-- **Padding** — leading/trailing spaces, and the occasional double space, inside
-  fields
-- **Duplicate records** for the same real-world entity, written with a different ID
-  casing/format and/or slightly different field values
-- **Inconsistent date formats** (`YYYY-MM-DD`, `MM/DD/YYYY`, `DD-MM-YYYY`, one- and
-  two-digit months/days) and outright invalid dates
-- **Missing / placeholder values** — blank fields, `N/A`, `n/a`, `TBD`, `unknown`,
-  `-`, `NaN`
-- **Invalid or non-numeric values** in numeric columns (negative counts, spelled-out
-  numbers, unrealistic values)
-- **Inconsistent boolean/flag representations** (`Y`/`N`, `yes`/`no`, `1`/`0`,
-  `true`/`FALSE`)
-- **Naming/spelling variants** for the same thing (e.g. regional spelling
-  differences, synonyms)
+- **Inconsistent casing**
+  - Hub IDs are normalized to uppercase.
+  - Province names and sorting center names are normalized to consistent casing.
 
-## Worked example
+- **Whitespace and padding**
+  - Leading and trailing whitespace is removed.
+  - Multiple internal spaces are collapsed into a single space.
 
-Two raw rows from `hubs-global.csv`:
+- **Boolean normalization**
+  - `Y`, `yes`, `1`, and `true` are normalized to `true`.
+  - `N`, `no`, `0`, and `false` are normalized to `false`.
 
-```
-hub_id, Province ,sorting_center,active
+- **Missing and placeholder values**
+  - Values such as blank fields, `N/A`, and `unknown` are handled as missing values.
+
+- **Duplicate records**
+  - Duplicate hubs are detected using the normalized province and sorting center.
+  - The service keeps one cleaned record for each real-world hub/sorting center combination.
+
+- **Naming variations**
+  - Province naming variations such as `Kwa-Zulu Natal` and `KwaZulu Natal` are normalized to `KwaZulu-Natal`.
+
+## Example
+
+### Raw data
+
+```text
 H-502 ,gauteng,Pretoria North,0
 H-505,Western Cape ,Cape Town  Port,TRUE
 ```
 
-A reasonable cleaned shape for those same two rows:
+### Cleaned data
 
-| hub_id | province | sorting_center | active |
+| Hub ID | Province | Sorting Center | Active |
 |---|---|---|---|
 | H-502 | Gauteng | Pretoria North | false |
 | H-505 | Western Cape | Cape Town Port | true |
 
-That covers padding (`H-502 ` → `H-502`), casing (`gauteng` → `Gauteng`), a
-collapsed double space (`Cape Town  Port` → `Cape Town Port`), and boolean
-normalization (`0`/`TRUE` → `false`/`true`). Column names, exact casing
-convention, and boolean representation are up to you — just be consistent.
+## REST Endpoints
 
-This doesn't cover deduplication: rows like `H-500`, `H-504`, `H-510`, and `H-515`
-all describe "Johannesburg Central" in "Gauteng" under different hub IDs, with
-conflicting `active` values between them. How you resolve that (which one wins,
-how you detect they're duplicates in the first place) is part of the exercise —
-there's no single correct answer, but be ready to explain your reasoning.
+### Health Check
 
-## Project structure
-
+```text
+GET /health
 ```
+
+Example:
+
+```bash
+curl http://localhost:7050/health
+```
+
+Response:
+
+```text
+OK
+```
+
+### Get Cleaned Hub Records
+
+```text
+GET /hubs
+```
+
+Example:
+
+```bash
+curl http://localhost:7050/hubs
+```
+
+Example response:
+
+```json
+[
+  {
+    "hubId": "H-500",
+    "province": "Gauteng",
+    "sortingCenter": "Johannesburg Central",
+    "active": true
+  },
+  {
+    "hubId": "H-501",
+    "province": "Western Cape",
+    "sortingCenter": "Cape Town Port",
+    "active": true
+  },
+  {
+    "hubId": "H-502",
+    "province": "Gauteng",
+    "sortingCenter": "Pretoria North",
+    "active": false
+  }
+]
+```
+
+## Project Structure
+
+```text
 ingestion-service/
 ├── pom.xml
+├── README.md
 └── src/main/
-    ├── java/co/wethinkcode/logisticsconnect/IngestionServiceApp.java
-    └── resources/hubs-global.csv
+    ├── java/
+    │   └── co/wethinkcode/logisticsconnect/
+    │       ├── IngestionServiceApp.java
+    │       └── Hub.java
+    └── resources/
+        └── hubs-global.csv
 ```
 
 ## Build
 
+Run the following command inside the `ingestion-service` directory:
+
+```bash
+mvn clean package
 ```
-mvn package
+
+A successful build creates:
+
+```text
+target/ingestion-service.jar
 ```
 
 ## Run
 
-```
+Start the service with:
+
+```bash
 java -jar target/ingestion-service.jar
 ```
 
-Listens on port `7050`. Currently just exposes `/health` — the actual CSV
-parsing/cleaning logic is a TODO.
+The service listens on port:
 
-## Test
-
-No automated tests yet. Manually verify it's up:
-
-```
-curl http://localhost:7050/health   # -> OK
+```text
+7050
 ```
 
-To add real tests, add JUnit 5 + the Surefire plugin to `pom.xml`, put tests under
-`src/test/java/co/wethinkcode/logisticsconnect/`, and run `mvn test`.
+## Manual Testing
+
+Check that the service is running:
+
+```bash
+curl http://localhost:7050/health
+```
+
+Expected response:
+
+```text
+OK
+```
+
+Retrieve the cleaned hub data:
+
+```bash
+curl http://localhost:7050/hubs
+```
+
+The response should be a JSON array containing cleaned and normalized hub records.
+
+## Stage 1 Completion
+
+Stage 1 implements the following:
+
+- [x] Reads `hubs-global.csv`
+- [x] Normalizes casing
+- [x] Removes unnecessary whitespace
+- [x] Collapses internal double spaces
+- [x] Normalizes boolean values
+- [x] Handles missing and placeholder values
+- [x] Detects and resolves duplicate records
+- [x] Normalizes naming variations
+- [x] Exposes cleaned records through a REST endpoint
+- [x] Provides a `/health` endpoint
+
+## Next Stage
+
+The cleaned hub data produced by this service will be consumed by the `hub-service` during Stage 2 of the LogisticsConnect project.
