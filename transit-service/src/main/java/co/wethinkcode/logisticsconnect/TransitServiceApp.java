@@ -21,7 +21,20 @@ public class TransitServiceApp {
         app.get("/health", ctx -> ctx.result("OK"));
         app.get("/stage", ctx -> {
             ctx.json(new StageResponse(latestStage));
+            
         });
+        app.get("/eta/{hubId}", ctx -> {
+            String hubId = ctx.pathParam("hubId");
+
+            int etaMinutes = 30 + (latestStage * 10);
+
+            ctx.json(new EtaResponse(
+                    hubId,
+                    latestStage,
+                    etaMinutes
+            ));
+        });
+
         // TODO (Calculates estimated arrival windows based on hub and delay stage.)
         // Add domain endpoints for transit-service here.
  
@@ -110,6 +123,30 @@ public class TransitServiceApp {
             return stage;
         }
     
+    }
+    public static class EtaResponse {
+
+        private final String hubId;
+        private final int stage;
+        private final int etaMinutes;
+
+        public EtaResponse(String hubId, int stage, int etaMinutes) {
+            this.hubId = hubId;
+            this.stage = stage;
+            this.etaMinutes = etaMinutes;
+        }
+
+        public String getHubId() {
+            return hubId;
+        }
+
+        public int getStage() {
+            return stage;
+        }
+
+        public int getEtaMinutes() {
+            return etaMinutes;
+        }
     }
 }
 
