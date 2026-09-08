@@ -82,6 +82,30 @@ public class AlertBotApp {
         subscriberThread.setDaemon(true);
         subscriberThread.start();
     }
+    // Extracted so that the alert logic can be tested independently.
+    public static boolean shouldAlert(int stage) {
+        return stage >= ALERT_THRESHOLD;
+    }
+
+    // Extracted so that message processing can be tested independently.
+    public static void processStageMessage(String messageBody) {
+        int stage = Integer.parseInt(
+                messageBody
+                        .replace("{\"stage\":", "")
+                        .replace("}", "")
+        );
+
+        if (shouldAlert(stage)) {
+            postAlert(stage);
+        } else {
+            System.out.println(
+                    "No alert needed. Stage "
+                            + stage
+                            + " is below threshold "
+                            + ALERT_THRESHOLD
+            );
+        }
+    }
 
     private static void postAlert(int stage) {
         System.out.println();
