@@ -14,18 +14,21 @@ import io.javalin.Javalin;
 public class DelayStageServiceApp {
     private static int currentStage = 0;
 
-    public static void main(String[] args) {
-        Javalin app = Javalin.create().start(7052);
+    public static Javalin createApp() {
+
+        Javalin app = Javalin.create();
 
         app.get("/health", ctx -> ctx.result("OK"));
 
-        // TODO (Tracks the Transit Delay Stage (0-8, e.g. weather shutdowns).)
-        // Add domain endpoints for delay-stage-service here.
         app.get("/stage", ctx -> {
             ctx.json(new StageResponse(currentStage));
         });
+
         app.put("/stage/{stage}", ctx -> {
-            int newStage = Integer.parseInt(ctx.pathParam("stage"));
+
+            int newStage = Integer.parseInt(
+                    ctx.pathParam("stage")
+            );
 
             if (newStage < 0 || newStage > 8) {
                 ctx.status(400);
@@ -39,8 +42,12 @@ public class DelayStageServiceApp {
 
             ctx.json(new StageResponse(newStage));
         });
+        return app;
 // MQ TODO: publishes to ActiveMQ topic MqConfig.TOPIC at MqConfig.BROKER_URL (see co.wethinkcode.logisticsconnect.mq.MqConfig)
 
+    }
+    public static void main(String[] args) {
+        createApp().start(7052);
     }
     private static void publishStageChange(int stage) {
         ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(MqConfig.BROKER_URL);

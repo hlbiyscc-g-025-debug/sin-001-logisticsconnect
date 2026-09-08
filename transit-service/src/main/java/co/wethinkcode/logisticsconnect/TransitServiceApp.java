@@ -8,22 +8,26 @@ import javax.jms.Topic;
 
 import org.apache.activemq.ActiveMQConnectionFactory;
 
+import co.wethinkcode.logisticsconnect.TransitServiceApp.EtaResponse;
+import co.wethinkcode.logisticsconnect.TransitServiceApp.StageResponse;
 import co.wethinkcode.logisticsconnect.mq.MqConfig;
 import io.javalin.Javalin;
 
 public class TransitServiceApp {
     private static int latestStage = 0;
 
-    public static void main(String[] args) {
-        startSubscriber();
-        Javalin app = Javalin.create().start(7053);
+    public static Javalin createApp() {
+
+        Javalin app = Javalin.create();
 
         app.get("/health", ctx -> ctx.result("OK"));
+
         app.get("/stage", ctx -> {
             ctx.json(new StageResponse(latestStage));
-            
         });
+
         app.get("/eta/{hubId}", ctx -> {
+
             String hubId = ctx.pathParam("hubId");
 
             int etaMinutes = 30 + (latestStage * 10);
@@ -34,7 +38,7 @@ public class TransitServiceApp {
                     etaMinutes
             ));
         });
-
+        return app;
         // TODO (Calculates estimated arrival windows based on hub and delay stage.)
         // Add domain endpoints for transit-service here.
  
@@ -109,6 +113,19 @@ public class TransitServiceApp {
 
         subscriberThread.setDaemon(true);
         subscriberThread.start();
+    }
+    //Used by automated tests to simulate receiving an MQ message
+    static void updateStageFromMessage(String messageBody) {
+
+        String stageValue =
+                messageBody
+                        .replace("{\"stage\":", "")
+                        .replace("}", "");
+
+        latestStage = Integer.parseInt(stageValue);
+    }
+    static void resetStage() {
+        latestStage = 0;
     }
 
     public static class StageResponse {
