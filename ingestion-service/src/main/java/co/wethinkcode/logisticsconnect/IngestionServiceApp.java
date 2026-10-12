@@ -1,16 +1,16 @@
 package co.wethinkcode.logisticsconnect;
 
-import java.util.Locale;
-import com.opencsv.CSVReader;
-import io.javalin.Javalin;
-
-import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
+
+import com.opencsv.CSVReader;
+
+import io.javalin.Javalin;
 
 public class IngestionServiceApp {
 
@@ -28,8 +28,7 @@ public class IngestionServiceApp {
 
     private static List<Hub> loadAndCleanHubs() {
         List<Hub> cleanedHubs = new ArrayList<>();
-        Set<String> seenLocations = new HashSet<>();
-
+        Set<String> seenHubIds = new HashSet<>();
         InputStream inputStream = IngestionServiceApp.class
                 .getClassLoader()
                 .getResourceAsStream("hubs-global.csv");
@@ -67,15 +66,11 @@ public class IngestionServiceApp {
                  * A province + sorting center represents one real-world entity.
                  * We keep the first cleaned record and discard later duplicates.
                  */
-                String duplicateKey = province.toLowerCase(Locale.ROOT)
-                        + "|"
-                        + sortingCenter.toLowerCase(Locale.ROOT);
-
-                if (seenLocations.contains(duplicateKey)) {
+                if (seenHubIds.contains(hubId)) {
                     continue;
                 }
 
-                seenLocations.add(duplicateKey);
+                seenHubIds.add(hubId);
 
                 cleanedHubs.add(new Hub(
                         hubId,
